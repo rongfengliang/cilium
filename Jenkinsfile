@@ -3,7 +3,7 @@ pipeline {
         label 'baremetal'
     }
     options {
-        timeout(time: 140, unit: 'MINUTES')
+        timeout(time: 300, unit: 'MINUTES')
         timestamps()
     }
     stages {
