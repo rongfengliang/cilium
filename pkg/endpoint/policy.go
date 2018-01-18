@@ -15,6 +15,7 @@
 package endpoint
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -26,8 +27,10 @@ import (
 
 	"github.com/cilium/cilium/api/v1/models"
 	"github.com/cilium/cilium/common"
+	"github.com/cilium/cilium/common/addressing"
 	"github.com/cilium/cilium/pkg/controller"
 	identityPkg "github.com/cilium/cilium/pkg/identity"
+	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/cilium/cilium/pkg/k8s"
 	"github.com/cilium/cilium/pkg/kvstore"
 	"github.com/cilium/cilium/pkg/labels"
@@ -37,9 +40,6 @@ import (
 	"github.com/cilium/cilium/pkg/policy"
 	"github.com/cilium/cilium/pkg/policy/api"
 
-	"encoding/json"
-	"github.com/cilium/cilium/common/addressing"
-	"github.com/cilium/cilium/pkg/ipcache"
 	"github.com/sirupsen/logrus"
 )
 
@@ -905,6 +905,7 @@ func (e *Endpoint) runIPIdentitySync(endpointIP addressing.CiliumIP) {
 
 				ipKey := path.Join(ipcache.IPIdentitiesPath, ipcache.AddressSpace, endpointIP.String())
 				e.Mutex.RLock()
+
 				if e.SecurityIdentity == nil {
 					e.Mutex.RUnlock()
 					return nil
@@ -945,6 +946,7 @@ func (e *Endpoint) runIPIdentitySync(endpointIP addressing.CiliumIP) {
 // SetIdentity resets endpoint's policy identity to 'id'.
 // Caller triggers policy regeneration if needed.
 // Called with e.Mutex Locked
+
 func (e *Endpoint) SetIdentity(owner Owner, identity *identityPkg.Identity) {
 	cache := policy.GetConsumableCache()
 
