@@ -54,6 +54,7 @@ import (
 	"github.com/cilium/cilium/pkg/maps/lbmap"
 	"github.com/cilium/cilium/pkg/maps/lxcmap"
 	"github.com/cilium/cilium/pkg/maps/policymap"
+	"github.com/cilium/cilium/pkg/maps/remotelxcmap"
 	"github.com/cilium/cilium/pkg/maps/tunnel"
 	"github.com/cilium/cilium/pkg/monitor"
 	"github.com/cilium/cilium/pkg/node"
@@ -832,6 +833,10 @@ func (d *Daemon) init() error {
 
 		// Clean all endpoint entries
 		if err := lxcmap.LXCMap.DeleteAll(); err != nil {
+			return err
+		}
+
+		if err := remotelxcmap.RemoteLXCMap.DeleteAll(); err != nil {
 			return err
 		}
 

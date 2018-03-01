@@ -16,6 +16,8 @@ package ipcache
 
 import (
 	"encoding/json"
+	"fmt"
+	"net"
 	"path"
 	"sort"
 	"sync"
@@ -26,6 +28,7 @@ import (
 	"github.com/cilium/cilium/pkg/kvstore"
 	"github.com/cilium/cilium/pkg/lock"
 	"github.com/cilium/cilium/pkg/logging/logfields"
+	"github.com/cilium/cilium/pkg/maps/remotelxcmap"
 
 	"github.com/sirupsen/logrus"
 )
@@ -87,6 +90,23 @@ func (ipc *IPCache) upsert(endpointIP string, identity identity.NumericIdentity)
 		ipc.identityToIPCache[identity] = map[string]struct{}{}
 	}
 	ipc.identityToIPCache[identity][endpointIP] = struct{}{}
+
+	// Update BPF Maps.
+	ip, _, err := net.ParseCIDR(fmt.Sprintf("%s/32", endpointIP))
+	if err != nil {
+		log.WithFields(logrus.Fields{logfields.IPAddr: endpointIP}).WithError(err).
+			Warning("unable to parse CIDR for upserting endpoint IP")
+	}
+	ipToUpsert := remotelxcmap.NewEndpointKey(ip)
+
+	identityToUpsert := remotelxcmap.RemoteEndpointInfo{SecurityIdentity: uint16(identity)}
+
+	err = remotelxcmap.RemoteLXCMap.Update(ipToUpsert, identityToUpsert)
+	if err != nil {
+		log.WithError(err).WithFields(logrus.Fields{"key": ipToUpsert.String(),
+			"value": identityToUpsert.String()}).
+			Warning("unable to update bpf map")
+	}
 }
 
 // deleteLocked removes removes the provided IP-to-security-identity mapping
@@ -99,6 +119,20 @@ func (ipc *IPCache) deleteLocked(endpointIP string) {
 		delete(ipc.identityToIPCache[identity], endpointIP)
 		if len(ipc.identityToIPCache[identity]) == 0 {
 			delete(ipc.identityToIPCache, identity)
+		}
+
+		// Delete from BPF maps.
+		ip, _, err := net.ParseCIDR(fmt.Sprintf("%s/32", endpointIP))
+		if err != nil {
+			log.WithFields(logrus.Fields{logfields.IPAddr: endpointIP}).
+				WithError(err).Warningf("unable to parse CIDR for deleting endpoint IP")
+		}
+		ipToDelete := remotelxcmap.NewEndpointKey(ip)
+
+		err = remotelxcmap.RemoteLXCMap.Delete(ipToDelete)
+		if err != nil {
+			log.WithError(err).WithFields(logrus.Fields{"key": ipToDelete.String()}).
+				Warning("unable to delete from bpf map")
 		}
 	}
 }

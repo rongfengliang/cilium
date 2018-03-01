@@ -20,5 +20,6 @@ Local endpoint map
 ### SEE ALSO
 * [cilium bpf](cilium_bpf.html)	 - Direct access to local BPF maps
 * [cilium bpf endpoint delete](cilium_bpf_endpoint_delete.html)	 - Delete local endpoint entries
+* [cilium bpf endpoint ip](cilium_bpf_endpoint_ip.html)	 - List remote endpoint IPs and their corresponding security identities
 * [cilium bpf endpoint list](cilium_bpf_endpoint_list.html)	 - List local endpoint entries
 
