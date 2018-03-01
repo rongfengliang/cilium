@@ -16,6 +16,8 @@ package ipcache
 
 import (
 	"encoding/json"
+	"fmt"
+	"net"
 	"path"
 	"sort"
 	"sync"
@@ -27,6 +29,7 @@ import (
 	"github.com/cilium/cilium/pkg/kvstore"
 	"github.com/cilium/cilium/pkg/lock"
 	"github.com/cilium/cilium/pkg/logging/logfields"
+	"github.com/cilium/cilium/pkg/maps/remoteendpointmap"
 
 	"github.com/sirupsen/logrus"
 )
@@ -96,6 +99,21 @@ func (ipc *IPCache) Upsert(endpointIP string, identity identity.NumericIdentity)
 	sort.Strings(ipStrings)
 	ipc.xdsResourceMutator.Upsert(envoy.NetworkPolicyHostsTypeURL, identity.StringID(), &envoyAPI.NetworkPolicyHosts{Policy: uint64(identity), HostAddresses: ipStrings}, false)
 
+	// Update BPF Maps.
+	ip, _, err := net.ParseCIDR(fmt.Sprintf("%s/32", endpointIP))
+	if err != nil {
+		log.WithFields(logrus.Fields{logfields.IPAddr: endpointIP}).WithError(err).
+			Warning("unable to parse CIDR for upserting endpoint IP")
+	}
+	ipToUpsert := remoteendpointmap.NewEndpointKey(ip)
+	identityToUpsert := remoteendpointmap.RemoteEndpointInfo{SecurityIdentity: identity.Uint32()}
+
+	err = remoteendpointmap.RemoteEpMap.Update(ipToUpsert, identityToUpsert)
+	if err != nil {
+		log.WithError(err).WithFields(logrus.Fields{"key": ipToUpsert.String(),
+			"value": identityToUpsert.String()}).
+			Warning("unable to update bpf map")
+	}
 }
 
 // Delete removes the provided IP-to-security-identity mapping from both caches
@@ -112,6 +130,20 @@ func (ipc *IPCache) Delete(endpointIP string) {
 			delete(ipc.identityToIPCache, identity)
 		}
 		ipc.xdsResourceMutator.Delete(envoy.NetworkPolicyHostsTypeURL, identity.StringID(), false)
+
+		// Delete from BPF maps.
+		ip, _, err := net.ParseCIDR(fmt.Sprintf("%s/32", endpointIP))
+		if err != nil {
+			log.WithFields(logrus.Fields{logfields.IPAddr: endpointIP}).
+				WithError(err).Warningf("unable to parse CIDR for deleting endpoint IP")
+		}
+		ipToDelete := remoteendpointmap.NewEndpointKey(ip)
+
+		err = remoteendpointmap.RemoteEpMap.Delete(ipToDelete)
+		if err != nil {
+			log.WithError(err).WithFields(logrus.Fields{"key": ipToDelete.String()}).
+				Warning("unable to delete from bpf map")
+		}
 	}
 }
 

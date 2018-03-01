@@ -54,6 +54,7 @@ import (
 	"github.com/cilium/cilium/pkg/maps/lbmap"
 	"github.com/cilium/cilium/pkg/maps/lxcmap"
 	"github.com/cilium/cilium/pkg/maps/policymap"
+	"github.com/cilium/cilium/pkg/maps/remoteendpointmap"
 	"github.com/cilium/cilium/pkg/maps/tunnel"
 	"github.com/cilium/cilium/pkg/monitor"
 	"github.com/cilium/cilium/pkg/node"
@@ -62,7 +63,6 @@ import (
 	"github.com/cilium/cilium/pkg/proxy/accesslog"
 	"github.com/cilium/cilium/pkg/workloads"
 	"github.com/cilium/cilium/pkg/workloads/containerd"
-	
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/mattn/go-shellwords"
 	"github.com/sirupsen/logrus"
@@ -841,6 +841,10 @@ func (d *Daemon) init() error {
 
 		// Clean all endpoint entries
 		if err := lxcmap.LXCMap.DeleteAll(); err != nil {
+			return err
+		}
+
+		if err := remoteendpointmap.RemoteEpMap.DeleteAll(); err != nil {
 			return err
 		}
 
