@@ -27,8 +27,17 @@ envoy_cc_binary(
     name = "envoy",
     repository = "@envoy",
     deps = [
+        # Cilium filters.
         ":cilium_bpf_metadata_lib",
         ":cilium_l7policy_lib",
+
+        # Istio filters.
+        # Cf. https://github.com/istio/proxy/blob/master/src/envoy/BUILD#L23
+        "@istio_proxy//src/envoy/http/jwt_auth:http_filter_factory",
+        "@istio_proxy//src/envoy/http/authn:filter_lib",
+        "@istio_proxy//src/envoy/http/mixer:filter_lib",
+        "@istio_proxy//src/envoy/tcp/mixer:filter_lib",
+
         "@envoy//source/exe:envoy_main_entry_lib",
     ],
 )

@@ -40,3 +40,23 @@ go_rules_dependencies()
 go_register_toolchains()
 load("@io_bazel_rules_go//proto:def.bzl", "proto_register_toolchains")
 proto_register_toolchains()
+
+
+# Dependencies for Istio filters.
+# Cf. https://github.com/istio/proxy.
+
+ISTIO_PROXY_SHA = "3f55851d9eb4da499ba49c8179d91480ec1b0ffd"
+
+http_archive(
+    name = "istio_proxy",
+    url = "https://github.com/istio/proxy/archive/" + ISTIO_PROXY_SHA + ".zip",
+    strip_prefix = "proxy-" + ISTIO_PROXY_SHA,
+)
+
+load("@istio_proxy//:repositories.bzl", "mixerapi_dependencies")
+mixerapi_dependencies()
+
+bind(
+    name = "boringssl_crypto",
+    actual = "//external:ssl",
+)
