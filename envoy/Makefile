@@ -106,7 +106,28 @@ debug-tests: force-non-root
 	$(BAZEL) $(BAZEL_OPTS) test $(BAZEL_BUILD_OPTS) -c debug $(BAZEL_TEST_OPTS) //:envoy_binary_test
 	$(BAZEL) $(BAZEL_OPTS) test $(BAZEL_BUILD_OPTS) -c debug $(BAZEL_TEST_OPTS) //:cilium_integration_test
 
-.PHONY: force force-root force-non-root
+.PHONY: \
+	api \
+	bazel-archive \
+	bazel-clean-archive \
+	bazel-restore \
+	check \
+	clean \
+	clean-bins \
+	debug \
+	debug-tests \
+	envoy \
+	envoy-debug \
+	envoy-release \
+	fix \
+	force \
+	force-non-root \
+	force-root \
+	install \
+	release \
+	tests \
+	veryclean
+
 force :;
 
 force-root:
