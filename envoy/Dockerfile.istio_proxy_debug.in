@@ -1,0 +1,9 @@
+FROM istio/proxy_debug:@ISTIO_VERSION@
+
+# Replace Istio's Envoy binary with Cilium's.
+ADD envoy /usr/local/bin
+
+# Run Envoy with the setuid bit in order to get the CAP_NET_ADMIN capability.
+RUN chmod u+s /usr/local/bin/envoy
+
+ENTRYPOINT ["/usr/local/bin/pilot-agent"]

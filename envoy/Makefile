@@ -15,7 +15,8 @@
 include ../Makefile.defs
 
 ENVOY_BIN = ./bazel-bin/envoy
-ENVOY_BINS = $(ENVOY_BIN) ./bazel-bin/cilium_integration_test
+ENVOY_RELEASE_BIN = ./envoy
+ENVOY_BINS = $(ENVOY_BIN) $(ENVOY_RELEASE_BIN) ./bazel-bin/cilium_integration_test
 CHECK_FORMAT ?= ./bazel-bin/check_format.py.runfiles/envoy/tools/check_format.py
 
 BAZEL ?= bazel
@@ -36,22 +37,37 @@ else
 BAZEL_OPTS ?=
 BAZEL_BUILD_OPTS = --experimental_strict_action_env
 
+ISTIO_VERSION = 0.6.0
+
 all: clean-bins envoy api
 endif
 
 debug: envoy-debug api
 
-release: envoy-release api
+release: $(ENVOY_RELEASE_BIN) api
 
 api: force-non-root Makefile.api
 	$(MAKE) -f Makefile.api all
 
-envoy: force-non-root
+envoy-default: force-non-root
 	$(BAZEL) $(BAZEL_OPTS) build $(BAZEL_BUILD_OPTS) //:envoy
 
 # Allow root build for release
-$(ENVOY_BIN) envoy-release: force
+$(ENVOY_BIN) $(ENVOY_RELEASE_BIN): force
 	$(BAZEL) $(BAZEL_OPTS) build $(BAZEL_BUILD_OPTS) -c opt //:envoy
+	$(STRIP) -o $(ENVOY_RELEASE_BIN) $(ENVOY_BIN)
+
+Dockerfile.%: Dockerfile.%.in
+	-sed "s/@ISTIO_VERSION@/$(ISTIO_VERSION)/" <$< >$@
+
+docker-istio-proxy: Dockerfile.istio_proxy $(ENVOY_RELEASE_BIN)
+	-docker build -f $< -t cilium/istio_proxy:$(ISTIO_VERSION) .
+
+docker-istio-proxy-debug: Dockerfile.istio_proxy_debug $(ENVOY_RELEASE_BIN)
+	-docker build -f $< -t cilium/istio_proxy_debug:$(ISTIO_VERSION) .
+
+docker-istio-proxy-init: Dockerfile.istio_proxy_init
+	-docker build -f $< -t cilium/istio_proxy_init:$(ISTIO_VERSION) .
 
 envoy-debug: force-non-root
 	$(BAZEL) $(BAZEL_OPTS) build $(BAZEL_BUILD_OPTS) -c dbg //:envoy
@@ -61,11 +77,7 @@ $(CHECK_FORMAT): force-non-root
 
 install: force-root
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
-	$(INSTALL) -m 0755 -T $(ENVOY_BIN) $(DESTDIR)$(BINDIR)/cilium-envoy
-# Strip only non-debug builds
-ifeq "$(findstring -dbg,$(realpath bazel-bin))" ""
-	$(STRIP) $(DESTDIR)$(BINDIR)/cilium-envoy
-endif
+	$(INSTALL) -m 0755 -T $(ENVOY_RELEASE_BIN) $(DESTDIR)$(BINDIR)/cilium-envoy
 
 bazel-archive: force-non-root tests clean-bins
 	-sudo rm -f $(BAZEL_ARCHIVE)
@@ -82,12 +94,15 @@ bazel-restore: $(BAZEL_ARCHIVE)
 
 # Remove the binaries to get fresh version SHA
 clean-bins: force
-	-rm -f $(ENVOY_BINS)
+	-rm -f $(ENVOY_BINS) \
+		Dockerfile.istio_proxy \
+		Dockerfile.istio_proxy_debug \
+		Dockerfile.istio_proxy_init
 
-clean: force
+clean: force clean-bins
 	echo "Bazel clean skipped, try \"make veryclean\" instead."
 
-veryclean: force
+veryclean: force clean-bins
 	-sudo $(BAZEL) $(BAZEL_OPTS) clean
 	-sudo rm -Rf $(BAZEL_CACHE)
 
@@ -116,8 +131,11 @@ debug-tests: force-non-root
 	clean-bins \
 	debug \
 	debug-tests \
-	envoy \
+	docker-istio-proxy \
+	docker-istio-proxy-debug \
+	docker-istio-proxy-init \
 	envoy-debug \
+	envoy-default \
 	envoy-release \
 	fix \
 	force \

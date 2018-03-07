@@ -1,0 +1,24 @@
+FROM istio/proxy_init:@ISTIO_VERSION@
+
+# Use iptables TPROXY instead of REDIRECT for inbound connections.
+#
+# The resulting diff is:
+#
+#  # Create a new chain for redirecting inbound and outbound traffic to
+#  # the common Envoy port.
+#  iptables -t nat -N ISTIO_REDIRECT                                             -m comment --comment "istio/redirect-common-chain"
+# +iptables -t mangle -N ISTIO_TPROXY                                            -m comment --comment "istio/redirect-common-chain"
+#  iptables -t nat -A ISTIO_REDIRECT -p tcp -j REDIRECT --to-port ${ENVOY_PORT}  -m comment --comment "istio/redirect-to-envoy-port"
+# +iptables -t mangle -A ISTIO_TPROXY -p tcp -j TPROXY --on-port ${ENVOY_PORT}   -m comment --comment "istio/redirect-to-envoy-port"
+#
+#  # Redirect all inbound traffic to Envoy.
+# -iptables -t nat -A PREROUTING -j ISTIO_REDIRECT                               -m comment --comment "istio/install-istio-prerouting"
+# +iptables -t mangle -A PREROUTING -j ISTIO_TPROXY                              -m comment --comment "istio/install-istio-prerouting"
+
+RUN sed \
+	-e 's/^\(iptables -t nat -N ISTIO_REDIRECT \)\(.*\)$/\1\2\niptables -t mangle -N ISTIO_TPROXY\2/' \
+	-e 's/^\(iptables -t nat -A ISTIO_REDIRECT -p tcp -j REDIRECT --to-port ${ENVOY_PORT}\)\(.*\)$/\1\2\niptables -t mangle -A ISTIO_TPROXY -p tcp -j TPROXY --on-port ${ENVOY_PORT} \2/' \
+	-e 's/^iptables -t nat -A PREROUTING -j ISTIO_REDIRECT /iptables -t mangle -A PREROUTING -j ISTIO_TPROXY/' \
+	-i /usr/local/bin/prepare_proxy.sh
+
+ENTRYPOINT ["/usr/local/bin/prepare_proxy.sh"]
