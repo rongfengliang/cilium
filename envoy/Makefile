@@ -14,9 +14,16 @@
 
 include ../Makefile.defs
 
-ENVOY_BIN = ./bazel-bin/envoy
-ENVOY_RELEASE_BIN = ./envoy
-ENVOY_BINS = $(ENVOY_BIN) $(ENVOY_RELEASE_BIN) ./bazel-bin/cilium_integration_test
+CILIUM_ENVOY_BIN = ./bazel-bin/cilium-envoy
+CILIUM_ENVOY_RELEASE_BIN = ./cilium-envoy
+ISTIO_ENVOY_BIN = ./bazel-bin/istio-envoy
+ISTIO_ENVOY_RELEASE_BIN = ./istio-envoy
+ENVOY_BINS = \
+	$(CILIUM_ENVOY_BIN) \
+	$(CILIUM_ENVOY_RELEASE_BIN) \
+	$(ISTIO_ENVOY_BIN) \
+	$(ISTIO_ENVOY_RELEASE_BIN) \
+	./bazel-bin/cilium_integration_test
 CHECK_FORMAT ?= ./bazel-bin/check_format.py.runfiles/envoy/tools/check_format.py
 
 BAZEL ?= bazel
@@ -39,45 +46,50 @@ BAZEL_BUILD_OPTS = --experimental_strict_action_env
 
 ISTIO_VERSION = 0.6.0
 
-all: clean-bins envoy api
+all: clean-bins $(CILIUM_ENVOY_RELEASE_BIN) api
 endif
 
 debug: envoy-debug api
 
-release: $(ENVOY_RELEASE_BIN) api
+release: $(CILIUM_ENVOY_RELEASE_BIN) api
 
 api: force-non-root Makefile.api
 	$(MAKE) -f Makefile.api all
 
 envoy-default: force-non-root
-	$(BAZEL) $(BAZEL_OPTS) build $(BAZEL_BUILD_OPTS) //:envoy
+	$(BAZEL) $(BAZEL_OPTS) build $(BAZEL_BUILD_OPTS) //:cilium-envoy
 
 # Allow root build for release
-$(ENVOY_BIN) $(ENVOY_RELEASE_BIN): force
-	$(BAZEL) $(BAZEL_OPTS) build $(BAZEL_BUILD_OPTS) -c opt //:envoy
-	$(STRIP) -o $(ENVOY_RELEASE_BIN) $(ENVOY_BIN)
+$(CILIUM_ENVOY_BIN) $(CILIUM_ENVOY_RELEASE_BIN): force
+	$(BAZEL) $(BAZEL_OPTS) build $(BAZEL_BUILD_OPTS) -c opt //:cilium-envoy
+	$(STRIP) -o $(CILIUM_ENVOY_RELEASE_BIN) $(CILIUM_ENVOY_BIN)
+
+# Allow root build for release
+$(ISTIO_ENVOY_BIN) $(ISTIO_ENVOY_RELEASE_BIN): force
+	$(BAZEL) $(BAZEL_OPTS) build $(BAZEL_BUILD_OPTS) -c opt //:istio-envoy
+	$(STRIP) -o $(ISTIO_ENVOY_RELEASE_BIN) $(ISTIO_ENVOY_BIN)
 
 Dockerfile.%: Dockerfile.%.in
 	-sed "s/@ISTIO_VERSION@/$(ISTIO_VERSION)/" <$< >$@
 
-docker-istio-proxy: Dockerfile.istio_proxy $(ENVOY_RELEASE_BIN)
+docker-istio-proxy: Dockerfile.istio_proxy $(ISTIO_ENVOY_RELEASE_BIN)
 	-docker build -f $< -t cilium/istio_proxy:$(ISTIO_VERSION) .
 
-docker-istio-proxy-debug: Dockerfile.istio_proxy_debug $(ENVOY_RELEASE_BIN)
+docker-istio-proxy-debug: Dockerfile.istio_proxy_debug $(ISTIO_ENVOY_RELEASE_BIN)
 	-docker build -f $< -t cilium/istio_proxy_debug:$(ISTIO_VERSION) .
 
 docker-istio-proxy-init: Dockerfile.istio_proxy_init
 	-docker build -f $< -t cilium/istio_proxy_init:$(ISTIO_VERSION) .
 
 envoy-debug: force-non-root
-	$(BAZEL) $(BAZEL_OPTS) build $(BAZEL_BUILD_OPTS) -c dbg //:envoy
+	$(BAZEL) $(BAZEL_OPTS) build $(BAZEL_BUILD_OPTS) -c dbg //:cilium-envoy
 
 $(CHECK_FORMAT): force-non-root
 	$(BAZEL) $(BAZEL_OPTS) build $(BAZEL_BUILD_OPTS) //:check_format.py
 
 install: force-root
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
-	$(INSTALL) -m 0755 -T $(ENVOY_RELEASE_BIN) $(DESTDIR)$(BINDIR)/cilium-envoy
+	$(INSTALL) -m 0755 -T $(CILIUM_ENVOY_RELEASE_BIN) $(DESTDIR)$(BINDIR)/cilium-envoy
 
 bazel-archive: force-non-root tests clean-bins
 	-sudo rm -f $(BAZEL_ARCHIVE)

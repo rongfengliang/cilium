@@ -52,7 +52,8 @@ man/
 
 # Bazel symlinks
 bazel-*
-envoy/envoy
+envoy/cilium-envoy
+envoy/istio-envoy
 envoy/Dockerfile.istio_proxy
 envoy/Dockerfile.istio_proxy_debug
 envoy/Dockerfile.istio_proxy_init
