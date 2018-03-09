@@ -57,19 +57,19 @@ void NetworkPolicyMap::onConfigUpdate(const ResourceVector& resources) {
     ENVOY_LOG(warn, "Empty Network Policy in onConfigUpdate()");
     return;
   }
-  std::unordered_set<uint32_t> keeps;
+  std::unordered_set<std::string> keeps;
 
   // Collect a shared vector of policies to be added
   auto to_be_added = std::make_shared<std::vector<std::shared_ptr<PolicyInstance>>>();
   for (const auto& config: resources) {
-    ENVOY_LOG(debug, "Received Network Policy in onConfigUpdate() versionInfo: {} policy id: {}", subscription_->versionInfo(), config.policy());
-    keeps.insert(config.policy());
+    ENVOY_LOG(debug, "Received Network Policy for endpoint {} in onConfigUpdate() version {}", config.name(), subscription_->versionInfo(), config.name());
+    keeps.insert(config.name());
 
     MessageUtil::validate(config);
 
     // First find the old config to figure out if an update is needed.
     const uint64_t new_hash = MessageUtil::hash(config);
-    const auto& old_policy = GetPolicyInstance(config.policy());
+    const auto& old_policy = GetPolicyInstance(config.name());
     if (old_policy && old_policy->hash_ == new_hash &&
 	Protobuf::util::MessageDifferencer::Equals(old_policy->policy_proto_, config)) {
       ENVOY_LOG(debug, "New policy is equal to old one, not updating.");
@@ -79,8 +79,8 @@ void NetworkPolicyMap::onConfigUpdate(const ResourceVector& resources) {
     to_be_added->emplace_back(std::make_shared<PolicyInstance>(new_hash, config));
   }
 
-  // Collect a shared vector of policy ids to be removed
-  auto to_be_deleted = std::make_shared<std::vector<uint32_t>>();
+  // Collect a shared vector of policy names to be removed
+  auto to_be_deleted = std::make_shared<std::vector<std::string>>();
   for (auto& pair: tls_->getTyped<ThreadLocalPolicyMap>().policies_) {
     if (keeps.find(pair.first) == keeps.end()) {
       to_be_deleted->emplace_back(pair.first);
@@ -94,13 +94,13 @@ void NetworkPolicyMap::onConfigUpdate(const ResourceVector& resources) {
 	return;
       }
       auto& npmap = tls_->getTyped<ThreadLocalPolicyMap>().policies_;
-      for (auto policy_id: *to_be_deleted) {
-	ENVOY_LOG(debug, "Cilium deleting removed network policy for {}", policy_id);
-	npmap.erase(policy_id);
+      for (const auto& policy_name: *to_be_deleted) {
+	ENVOY_LOG(debug, "Cilium deleting removed network policy for endpoint {}", policy_name);
+	npmap.erase(policy_name);
       }
       for (const auto& new_policy: *to_be_added) {
-	ENVOY_LOG(debug, "Cilium inserting network policy for {}", new_policy->policy_proto_.policy());
-	npmap[new_policy->policy_proto_.policy()] = new_policy;
+	ENVOY_LOG(debug, "Cilium inserting network policy for endpoint {}", new_policy->policy_proto_.name());
+	npmap[new_policy->policy_proto_.name()] = new_policy;
       }
     });
 }

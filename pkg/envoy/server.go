@@ -19,7 +19,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -157,7 +156,6 @@ func createXDSServer(path, accessLogPath string) *XDSServer {
 			Config: &structpb.Struct{Fields: map[string]*structpb.Value{
 				"is_ingress": {&structpb.Value_BoolValue{BoolValue: false}},
 				"bpf_root":   {&structpb.Value_StringValue{StringValue: "/sys/fs/bpf"}},
-				"identity":   {&structpb.Value_NumberValue{NumberValue: float64(0)}},
 			}},
 		}},
 	}
@@ -172,7 +170,7 @@ func createXDSServer(path, accessLogPath string) *XDSServer {
 	}
 }
 
-func (s *XDSServer) addListener(name string, port uint16, l7rules policy.L7DataMap, isIngress bool, logger Logger, wg *completion.WaitGroup) {
+func (s *XDSServer) addListener(name string, endpoint_policy_name string, port uint16, l7rules policy.L7DataMap, isIngress bool, logger Logger, wg *completion.WaitGroup) {
 	log.Debug("Envoy: addListener ", name)
 
 	s.mutex.Lock()
@@ -194,6 +192,7 @@ func (s *XDSServer) addListener(name string, port uint16, l7rules policy.L7DataM
 	listenerConf.Name = name
 	listenerConf.Address.GetSocketAddress().PortSpecifier = &envoy_api_v2_core.SocketAddress_PortValue{PortValue: uint32(port)}
 	listenerConf.FilterChains[0].Filters[0].Config.Fields["rds"].GetStructValue().Fields["route_config_name"] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: name}}
+	listenerConf.ListenerFilters[0].Config.Fields["policy_name"] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: endpoint_policy_name}}
 	if isIngress {
 		listenerConf.ListenerFilters[0].Config.Fields["is_ingress"].GetKind().(*structpb.Value_BoolValue).BoolValue = true
 	}
@@ -499,9 +498,10 @@ func getDirectionNetworkPolicy(l4Policy policy.L4PolicyMap, labelsMap identity.I
 }
 
 // getNetworkPolicy converts a network policy into a cilium.NetworkPolicy.
-func getNetworkPolicy(id identity.NumericIdentity, policy *policy.L4Policy,
+func getNetworkPolicy(endpoint_policy_name string, id identity.NumericIdentity, policy *policy.L4Policy,
 	labelsMap identity.IdentityCache, deniedIngressIdentities, deniedEgressIdentities map[identity.NumericIdentity]bool) *cilium.NetworkPolicy {
 	return &cilium.NetworkPolicy{
+		Name:                   endpoint_policy_name,
 		Policy:                 uint64(id),
 		IngressPerPortPolicies: getDirectionNetworkPolicy(policy.Ingress, labelsMap, deniedIngressIdentities),
 		EgressPerPortPolicies:  getDirectionNetworkPolicy(policy.Egress, labelsMap, deniedEgressIdentities),
@@ -510,22 +510,20 @@ func getNetworkPolicy(id identity.NumericIdentity, policy *policy.L4Policy,
 
 // UpdateNetworkPolicy adds or updates a network policy in the set of published
 // to L7 proxies.
-func UpdateNetworkPolicy(id identity.NumericIdentity, policy *policy.L4Policy,
+func UpdateNetworkPolicy(endpoint_policy_name string, id identity.NumericIdentity, policy *policy.L4Policy,
 	labelsMap identity.IdentityCache, deniedIngressIdentities, deniedEgressIdentities map[identity.NumericIdentity]bool) error {
-	networkPolicy := getNetworkPolicy(id, policy, labelsMap, deniedIngressIdentities, deniedEgressIdentities)
+	networkPolicy := getNetworkPolicy(endpoint_policy_name, id, policy, labelsMap, deniedIngressIdentities, deniedEgressIdentities)
 	err := networkPolicy.Validate()
 	if err != nil {
 		return fmt.Errorf("error validating generated NetworkPolicy: %s", err)
 	}
 
-	name := strconv.FormatUint(uint64(id), 10)
-	NetworkPolicyCache.Upsert(NetworkPolicyTypeURL, name, networkPolicy, false)
+	NetworkPolicyCache.Upsert(NetworkPolicyTypeURL, endpoint_policy_name, networkPolicy, false)
 	return nil
 }
 
 // RemoveNetworkPolicy removes a network policy from the set published to L7
 // proxies.
-func RemoveNetworkPolicy(id identity.NumericIdentity) {
-	name := strconv.FormatUint(uint64(id), 10)
-	NetworkPolicyCache.Delete(NetworkPolicyTypeURL, name, false)
+func RemoveNetworkPolicy(endpoint_policy_name string) {
+	NetworkPolicyCache.Delete(NetworkPolicyTypeURL, endpoint_policy_name, false)
 }

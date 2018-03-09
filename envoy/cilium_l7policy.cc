@@ -131,14 +131,15 @@ Http::FilterHeadersStatus AccessFilter::decodeHeaders(Http::HeaderMap& headers, 
       const auto options = dynamic_cast<Cilium::SocketOption*>(options_.get());
       if (options) {
 	if (options->ingress_) {
-	  allowed = config_->npmap_->Allowed(options->local_identity_, true, options->port_,
+	  allowed = config_->npmap_->Allowed(options->policy_name_, true, options->port_,
 					     options->source_identity_, headers);
-	  ENVOY_LOG(debug, "Cilium L7: Ingress policy lookup: {}", allowed ? "ALLOW" : "DENY");
 	} else {
-	  allowed = config_->npmap_->Allowed(options->source_identity_, false, options->port_,
+	  allowed = config_->npmap_->Allowed(options->policy_name_, false, options->port_,
 					     0 /* no remote ID yet */, headers);
-	  ENVOY_LOG(debug, "Cilium L7: Egress policy lookup: {}", allowed ? "ALLOW" : "DENY");
 	}
+	ENVOY_LOG(debug, "Cilium L7: {} policy lookup for endpoint {}: {}",
+		  options->ingress_ ? "Ingress" : "Egress", options->policy_name_,
+		  allowed ? "ALLOW" : "DENY");
       } else {
 	ENVOY_LOG(warn, "Cilium L7: Socket Options dynamic cast failed");
       }

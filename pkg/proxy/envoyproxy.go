@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
 
@@ -52,7 +53,8 @@ func createEnvoyRedirect(r *Redirect, wg *completion.WaitGroup) (RedirectImpleme
 	if envoyProxy != nil {
 		redir := &envoyRedirect{redirect: r}
 
-		envoyProxy.AddListener(r.id, r.ProxyPort, r.rules, r.ingress, redir, wg)
+		endpoint_policy_name := strconv.FormatUint(r.source.GetID(), 10)
+		envoyProxy.AddListener(r.id, endpoint_policy_name, r.ProxyPort, r.rules, r.ingress, redir, wg)
 
 		return redir, nil
 	}

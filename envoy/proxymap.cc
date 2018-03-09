@@ -122,7 +122,7 @@ bool ProxyMap::getBpfMetadata(Network::ConnectionSocket &socket) {
 	  socket.setLocalAddress(orig_local_address, true);
 	}
         uint32_t identity = value.identity;
-        socket.setOptions(std::make_shared<SocketOption>(parent_.getMark(identity), identity, parent_.identity_, parent_.is_ingress_, ntohs(value.orig_dport)));
+        socket.setOptions(std::make_shared<SocketOption>(parent_.getMark(identity), identity, parent_.policy_name_, parent_.is_ingress_, ntohs(value.orig_dport)));
         return true;
       }
       ENVOY_LOG(info, "cilium.bpf_metadata: IPv4 bpf map lookup failed: {}",
@@ -149,7 +149,7 @@ bool ProxyMap::getBpfMetadata(Network::ConnectionSocket &socket) {
 	  socket.setLocalAddress(orig_local_address, true);
 	}
         uint32_t identity = value.identity;
-        socket.setOptions(std::make_shared<SocketOption>(parent_.getMark(identity), identity, parent_.identity_, parent_.is_ingress_, ntohs(value.orig_dport)));
+        socket.setOptions(std::make_shared<SocketOption>(parent_.getMark(identity), identity, parent_.policy_name_, parent_.is_ingress_, ntohs(value.orig_dport)));
         return true;
       }
       ENVOY_LOG(info, "cilium.bpf_metadata: IPv6 bpf map lookup failed: {}",

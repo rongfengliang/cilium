@@ -46,7 +46,7 @@ func (m *BpfMetadata) Validate() error {
 
 	// no validation rules for IsIngress
 
-	// no validation rules for Identity
+	// no validation rules for PolicyName
 
 	return nil
 }

@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
 
@@ -508,7 +509,7 @@ func (e *Endpoint) IngressOrEgressIsEnforced() bool {
 // optimized away by the revision checks.  However, if there has been
 // a further policy update between the first and second calls, the
 // second call will update the policy just before regenerating the BPF
-// programs to avoid needing to regenerate BPF programs aging right
+// programs to avoid needing to regenerate BPF programs again right
 // after.
 //
 // Policy changes are tracked so that only endpoints affected by the
@@ -560,6 +561,8 @@ func (e *Endpoint) regeneratePolicy(owner Owner, opts models.ConfigurationMap) (
 		e.getLogger().WithError(err).Debug("Received error while evaluating policy")
 		return false, nil, nil, err
 	}
+	// Use the old labelsMap instance if the new one is still the same.
+	// Later we can compare the pointers to figure out if labels have changed or not.
 	if reflect.DeepEqual(e.LabelsMap, labelsMap) {
 		labelsMap = e.LabelsMap
 	}
@@ -570,6 +573,7 @@ func (e *Endpoint) regeneratePolicy(owner Owner, opts models.ConfigurationMap) (
 	defer repo.Mutex.RUnlock()
 
 	// Recompute policy for this endpoint only if not already done for this revision.
+	// Must recompute if labels have changed or option changes are requested.
 	if !e.forcePolicyCompute && e.nextPolicyRevision >= revision &&
 		labelsMap == e.LabelsMap && opts == nil {
 
@@ -686,7 +690,8 @@ func (e *Endpoint) regeneratePolicy(owner Owner, opts models.ConfigurationMap) (
 
 	// Publish the updated policy to L7 proxies.
 	// TODO: Pass the denied egress identities.
-	err = owner.UpdateNetworkPolicy(c.ID, c.L4Policy, *labelsMap, deniedIngressIdentities, nil)
+	endpoint_policy_name := strconv.FormatUint(uint64(e.ID), 10)
+	err = owner.UpdateNetworkPolicy(endpoint_policy_name, c.ID, c.L4Policy, *labelsMap, deniedIngressIdentities, nil)
 	if err != nil {
 		return false, nil, nil, err
 	}

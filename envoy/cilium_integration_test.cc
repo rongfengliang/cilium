@@ -36,7 +36,7 @@ class TestConfig : public Config {
 public:
   TestConfig(const ::cilium::BpfMetadata& config, Stats::Scope& scope)
     : Config(config, scope),
-      socket_mark_(std::make_shared<Cilium::SocketOption>(42, 1, 173, true, 80)) {}
+      socket_mark_(std::make_shared<Cilium::SocketOption>(42, 1, "173", true, 80)) {}
 
   Network::Socket::OptionsSharedPtr socket_mark_;
 };
@@ -195,7 +195,7 @@ static_resources:
       name: test_bpf_metadata
       config:
         is_ingress: true
-        identity: 173
+        policy_name: "173"
     filter_chains:
       filters:
         name: envoy.http_connection_manager
@@ -231,7 +231,7 @@ public:
     // Undo legacy compat rename done by HttpIntegrationTest constructor.
     // config_helper_.renameListener("cilium");
     for (const Logger::Logger& logger : Logger::Registry::loggers()) {
-      logger.setLevel(static_cast<spdlog::level::level_enum>(1));
+      logger.setLevel(static_cast<spdlog::level::level_enum>(0));
     }
   }
   ~CiliumIntegrationTest() {
@@ -309,6 +309,12 @@ TEST_P(CiliumIntegrationTest, AcceptedMethod) {
   Accepted({{":method", "PUT"},
             {":path", "/public/opinions"},
             {":authority", "host"}});
+}
+
+TEST_P(CiliumIntegrationTest, L3DeniedPath) {
+  Denied({{":method", "GET"},
+          {":path", "/only-2-allowed"},
+          {":authority", "host"}});
 }
 
 } // namespace Envoy

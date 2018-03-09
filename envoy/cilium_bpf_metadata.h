@@ -49,7 +49,7 @@ private:
 public:
   BpfStats stats_;
   bool is_ingress_;
-  uint32_t identity_;
+  std::string policy_name_;
   Cilium::ProxyMap maps_;
 };
 

@@ -33,13 +33,14 @@ public:
 
 class SocketOption : public SocketMarkOption {
 public:
-  SocketOption(uint32_t mark, uint32_t source_identity, uint32_t local_identity, bool ingress,
-               uint16_t port) : SocketMarkOption(mark), source_identity_(source_identity),
-                                local_identity_(local_identity), ingress_(ingress), port_(port) {
-    ENVOY_LOG(debug, "Cilium SocketOption(): mark: {}, source_identity: {}, local_identity: {}, ingress: {}, port: {}", mark, source_identity_, local_identity_, ingress_, port_);
+  SocketOption(uint32_t mark, uint32_t source_identity, const std::string& policy_name,
+               bool ingress, uint16_t port) : SocketMarkOption(mark),
+    source_identity_(source_identity), policy_name_(policy_name), ingress_(ingress),
+    port_(port) {
+    ENVOY_LOG(debug, "Cilium SocketOption(): mark: {}, source_identity: {}, endpoint policy name: {}, ingress: {}, port: {}", mark, source_identity_, policy_name_, ingress_, port_);
   }
   uint32_t source_identity_;
-  uint32_t local_identity_;
+  std::string policy_name_;
   bool ingress_;
   uint16_t port_;
 };

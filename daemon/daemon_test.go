@@ -56,8 +56,8 @@ type DaemonSuite struct {
 	OnGetPolicyRepository             func() *policy.Repository
 	OnUpdateProxyRedirect             func(e *e.Endpoint, l4 *policy.L4Filter) (uint16, error)
 	OnRemoveProxyRedirect             func(e *e.Endpoint, id string) error
-	OnUpdateNetworkPolicy             func(id identity.NumericIdentity, policy *policy.L4Policy, labelsMap identity.IdentityCache, deniedIngressIdentities, deniedEgressIdentities map[identity.NumericIdentity]bool) error
-	OnRemoveNetworkPolicy             func(id identity.NumericIdentity)
+	OnUpdateNetworkPolicy             func(endpoint_policy_name string, id identity.NumericIdentity, policy *policy.L4Policy, labelsMap identity.IdentityCache, deniedIngressIdentities, deniedEgressIdentities map[identity.NumericIdentity]bool) error
+	OnRemoveNetworkPolicy             func(endpoint_policy_name string)
 	OnGetStateDir                     func() string
 	OnGetBpfDir                       func() string
 	OnGetTunnelMode                   func() string
@@ -237,19 +237,19 @@ func (ds *DaemonSuite) RemoveProxyRedirect(e *e.Endpoint, id string) error {
 	panic("RemoveProxyRedirect should not have been called")
 }
 
-func (ds *DaemonSuite) UpdateNetworkPolicy(id identity.NumericIdentity, policy *policy.L4Policy,
+func (ds *DaemonSuite) UpdateNetworkPolicy(endpoint_policy_name string, id identity.NumericIdentity, policy *policy.L4Policy,
 	labelsMap identity.IdentityCache, deniedIngressIdentities, deniedEgressIdentities map[identity.NumericIdentity]bool) error {
 	if ds.OnUpdateNetworkPolicy != nil {
-		return ds.OnUpdateNetworkPolicy(id, policy, labelsMap, deniedIngressIdentities, deniedEgressIdentities)
+		return ds.OnUpdateNetworkPolicy(endpoint_policy_name, id, policy, labelsMap, deniedIngressIdentities, deniedEgressIdentities)
 	}
 	panic("UpdateNetworkPolicy should not have been called")
 }
 
-func (ds *DaemonSuite) RemoveNetworkPolicy(id identity.NumericIdentity) {
+func (ds *DaemonSuite) RemoveNetworkPolicy(endpoint_policy_name string) {
 	if ds.OnRemoveNetworkPolicy != nil {
-		ds.OnRemoveNetworkPolicy(id)
+		ds.OnRemoveNetworkPolicy(endpoint_policy_name)
 	}
-	panic("UpdateNetworkPolicy should not have been called")
+	panic("RemoveNetworkPolicy should not have been called")
 }
 
 func (ds *DaemonSuite) GetStateDir() string {

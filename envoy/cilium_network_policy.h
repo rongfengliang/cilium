@@ -173,29 +173,29 @@ public:
   };
 
   struct ThreadLocalPolicyMap : public ThreadLocal::ThreadLocalObject {
-    std::map<uint32_t, std::shared_ptr<const PolicyInstance>> policies_;
+    std::map<std::string, std::shared_ptr<const PolicyInstance>> policies_;
   };
 
-  const std::shared_ptr<const PolicyInstance>& GetPolicyInstance(uint32_t id) const {
+  const std::shared_ptr<const PolicyInstance>& GetPolicyInstance(const std::string& endpoint_policy_name) const {
     const ThreadLocalPolicyMap& map = tls_->getTyped<ThreadLocalPolicyMap>();
-    auto it = map.policies_.find(id);
+    auto it = map.policies_.find(endpoint_policy_name);
     if (it == map.policies_.end()) {
       return null_instance_;
     }
     return it->second;
   }
 
-  bool Allowed(uint32_t id, bool ingress, uint32_t port, uint64_t remote_id,
+  bool Allowed(const std::string& endpoint_policy_name, bool ingress, uint32_t port, uint64_t remote_id,
 	       const Envoy::Http::HeaderMap& headers) const {
-    ENVOY_LOG(trace, "Cilium L7 NetworkPolicyMap::Allowed(): {} lookup for id {}, port {}, remote_id: {}", ingress ? "Ingress" : "Egress", id, port, remote_id);
+    ENVOY_LOG(trace, "Cilium L7 NetworkPolicyMap::Allowed(): {} policy lookup for endpoint {}, port {}, remote_id: {}", ingress ? "Ingress" : "Egress", endpoint_policy_name, port, remote_id);
     if (tls_->get().get() == nullptr) {
       ENVOY_LOG(warn, "Cilium L7 NetworkPolicyMap::Allowed(): NULL TLS object!");
       return false;
     }
     const auto& npmap = tls_->getTyped<ThreadLocalPolicyMap>().policies_;
-    auto it = npmap.find(id);
+    auto it = npmap.find(endpoint_policy_name);
     if (it == npmap.end()) {
-      ENVOY_LOG(trace, "Cilium L7 NetworkPolicyMap::Allowed(): No policy found for {}", id);
+      ENVOY_LOG(trace, "Cilium L7 NetworkPolicyMap::Allowed(): No policy found for endpoint {}", endpoint_policy_name);
       return false;
     }
     return it->second->Allowed(ingress, port, remote_id, headers);
@@ -205,9 +205,7 @@ public:
   void onConfigUpdate(const ResourceVector& resources) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    std::string name = fmt::format("{}",
-				   MessageUtil::anyConvert<cilium::NetworkPolicy>(resource).policy());
-    return name;
+    return MessageUtil::anyConvert<cilium::NetworkPolicy>(resource).name();
   }
 
 private:
