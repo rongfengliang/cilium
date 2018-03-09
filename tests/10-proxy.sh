@@ -11,14 +11,11 @@ redirect_debug_logs ${LOGS_DIR}
 
 set -ex
 
-log "${TEST_NAME} has been deprecated and replaced by test/runtime/lb.go:Services Policies"
-exit 0
-
 function cleanup {
   monitor_stop
   cilium service delete --all 2> /dev/null || true
   cilium policy delete --all 2> /dev/null || true
-  docker rm -f server1 server2 client 2> /dev/null || true
+  docker rm -f server1 server2 client1 client2 2> /dev/null || true
 }
 
 function finish_test {
@@ -29,7 +26,6 @@ function finish_test {
 trap finish_test EXIT
 
 SERVER_LABEL="id.server"
-CLIENT_LABEL="id.client"
 
 SVC_IP="f00d::1:1"
 SVC_IP4="2.2.2.2"
@@ -64,7 +60,8 @@ function proxy_init {
 
   docker run -dt --net=$TEST_NET --name server1 -l $SERVER_LABEL cilium/demo-httpd
   docker run -dt --net=$TEST_NET --name server2 -l $SERVER_LABEL cilium/demo-httpd
-  docker run -dt --net=cilium --name client -l id.client tgraf/netperf
+  docker run -dt --net=cilium --name client1 -l id.client1 tgraf/netperf
+  docker run -dt --net=cilium --name client2 -l id.client2 tgraf/netperf
 
   SERVER1_IP=$(docker inspect --format '{{ .NetworkSettings.Networks.cilium.GlobalIPv6Address }}' server1)
   SERVER2_IP=$(docker inspect --format '{{ .NetworkSettings.Networks.cilium.GlobalIPv6Address }}' server2)
@@ -76,7 +73,8 @@ function proxy_init {
 
   wait_for_docker_ipv6_addr server1
   wait_for_docker_ipv6_addr server2
-  wait_for_docker_ipv6_addr client
+  wait_for_docker_ipv6_addr client1
+  wait_for_docker_ipv6_addr client2
 
   monitor_start
   log "finished proxy_init"
@@ -90,11 +88,12 @@ function policy_single_egress {
     "ingress": [{
         "fromEndpoints": [
 	    {"matchLabels":{"reserved:host":""}},
-	    {"matchLabels":{"id.client":""}}
+	    {"matchLabels":{"id.client1":""}},
+	    {"matchLabels":{"id.client2":""}}
 	]
     }]
 },{
-    "endpointSelector": {"matchLabels":{"id.client":""}},
+    "endpointSelector": {"matchLabels":{"id.client1":""}},
     "egress": [{
 	"toPorts": [{
 	    "ports": [{"port": "80", "protocol": "tcp"}],
@@ -102,6 +101,19 @@ function policy_single_egress {
                 "HTTP": [{
 		    "method": "GET",
 		    "path": "/public"
+                }]
+	    }
+	}]
+    }]
+},{
+    "endpointSelector": {"matchLabels":{"id.client2":""}},
+    "egress": [{
+	"toPorts": [{
+	    "ports": [{"port": "80", "protocol": "tcp"}],
+	    "rules": {
+                "HTTP": [{
+		    "method": "GET",
+		    "path": "/private"
                 }]
 	    }
 	}]
@@ -118,11 +130,12 @@ function policy_many_egress {
     "ingress": [{
         "fromEndpoints": [
 	    {"matchLabels":{"reserved:host":""}},
-	    {"matchLabels":{"id.client":""}}
+	    {"matchLabels":{"id.client1":""}},
+	    {"matchLabels":{"id.client2":""}}
 	]
     }]
 },{
-    "endpointSelector": {"matchLabels":{"id.client":""}},
+    "endpointSelector": {"matchLabels":{"id.client1":""}},
     "egress": [{
 	"toPorts": [{
 	    "ports": [{"port": "8000", "protocol": "tcp"},
@@ -133,6 +146,22 @@ function policy_many_egress {
                 "HTTP": [{
 		    "method": "GET",
 		    "path": "/public"
+                }]
+	    }
+	}]
+    }]
+},{
+    "endpointSelector": {"matchLabels":{"id.client2":""}},
+    "egress": [{
+	"toPorts": [{
+	    "ports": [{"port": "8000", "protocol": "tcp"},
+		      {"port": "80",   "protocol": "tcp"},
+		      {"port": "8080", "protocol": "tcp"},
+		      {"port": "8080", "protocol": "udp"}],
+	    "rules": {
+                "HTTP": [{
+		    "method": "GET",
+		    "path": "/private"
                 }]
 	    }
 	}]
@@ -149,7 +178,7 @@ function policy_single_ingress {
     "ingress": [{
         "fromEndpoints": [
 	    {"matchLabels":{"reserved:host":""}},
-	    {"matchLabels":{"id.client":""}}
+	    {"matchLabels":{"id.client1":""}}
 	],
 	"toPorts": [{
 	    "ports": [{"port": "80", "protocol": "tcp"}],
@@ -157,6 +186,20 @@ function policy_single_ingress {
                 "HTTP": [{
 		    "method": "GET",
 		    "path": "/public"
+                }]
+	    }
+	}]
+    },{
+        "fromEndpoints": [
+	    {"matchLabels":{"reserved:host":""}},
+	    {"matchLabels":{"id.client2":""}}
+	],
+	"toPorts": [{
+	    "ports": [{"port": "80", "protocol": "tcp"}],
+	    "rules": {
+                "HTTP": [{
+		    "method": "GET",
+		    "path": "/private"
                 }]
 	    }
 	}]
@@ -173,7 +216,7 @@ function policy_many_ingress {
     "ingress": [{
         "fromEndpoints": [
 	    {"matchLabels":{"reserved:host":""}},
-	    {"matchLabels":{"id.client":""}}
+	    {"matchLabels":{"id.client1":""}}
 	],
 	"toPorts": [{
 	    "ports": [{"port": "80", "protocol": "tcp"},
@@ -184,6 +227,23 @@ function policy_many_ingress {
                 "HTTP": [{
 		    "method": "GET",
 		    "path": "/public"
+                }]
+	    }
+	}]
+    },{
+        "fromEndpoints": [
+	    {"matchLabels":{"reserved:host":""}},
+	    {"matchLabels":{"id.client2":""}}
+	],
+	"toPorts": [{
+	    "ports": [{"port": "80", "protocol": "tcp"},
+		      {"port": "8080", "protool": "tcp"},
+		      {"port": "8080", "protocol": "udp"},
+		      {"port": "8000", "protocol": "udp"}],
+	    "rules": {
+                "HTTP": [{
+		    "method": "GET",
+		    "path": "/private"
                 }]
 	    }
 	}]
@@ -200,11 +260,12 @@ function policy_service_and_proxy_egress {
     "ingress": [{
         "fromEndpoints": [
 	    {"matchLabels":{"reserved:host":""}},
-	    {"matchLabels":{"id.client":""}}
+	    {"matchLabels":{"id.client1":""}},
+	    {"matchLabels":{"id.client2":""}}
 	]
     }]
 },{
-    "endpointSelector": {"matchLabels":{"id.client":""}},
+    "endpointSelector": {"matchLabels":{"id.client1":""}},
     "egress": [{
 	"toPorts": [{
 	    "ports": [{"port": "80", "protocol": "tcp"}],
@@ -212,6 +273,19 @@ function policy_service_and_proxy_egress {
                 "HTTP": [{
 		    "method": "GET",
 		    "path": "/public"
+                }]
+	    }
+	}]
+    }]
+},{
+    "endpointSelector": {"matchLabels":{"id.client2":""}},
+    "egress": [{
+	"toPorts": [{
+	    "ports": [{"port": "80", "protocol": "tcp"}],
+	    "rules": {
+                "HTTP": [{
+		    "method": "GET",
+		    "path": "/private"
                 }]
 	    }
 	}]
@@ -224,14 +298,7 @@ function policy_egress_and_ingress {
   cilium policy delete --all
   cat <<EOF | policy_import_and_wait -
 [{
-    "endpointSelector": {"matchLabels":{"id.server":""}},
-    "ingress": [{
-        "fromEndpoints": [
-	    {"matchLabels":{"id.client":""}}
-	]
-    }]
-},{
-    "endpointSelector": {"matchLabels":{"id.client":""}},
+    "endpointSelector": {"matchLabels":{"id.client1":""}},
     "egress": [{
 	"toPorts": [{
 	    "ports": [{"port": "80", "protocol": "tcp"}],
@@ -244,8 +311,24 @@ function policy_egress_and_ingress {
 	}]
     }]
 },{
+    "endpointSelector": {"matchLabels":{"id.client2":""}},
+    "egress": [{
+	"toPorts": [{
+	    "ports": [{"port": "80", "protocol": "tcp"}],
+	    "rules": {
+                "HTTP": [{
+		    "method": "GET",
+		    "path": "/private"
+                }]
+	    }
+	}]
+    }]
+},{
     "endpointSelector": {"matchLabels":{"id.server":""}},
     "ingress": [{
+        "fromEndpoints": [
+	    {"matchLabels":{"id.client1":""}}
+	],
 	"toPorts": [{
 	    "ports": [{"port": "8000", "protocol": "tcp"},
 		      {"port": "80",   "protocol": "tcp"},
@@ -258,6 +341,22 @@ function policy_egress_and_ingress {
                 }]
 	    }
 	}]
+    },{
+        "fromEndpoints": [
+	    {"matchLabels":{"id.client2":""}}
+	],
+	"toPorts": [{
+	    "ports": [{"port": "8000", "protocol": "tcp"},
+		      {"port": "80",   "protocol": "tcp"},
+		      {"port": "8080", "protocol": "tcp"},
+		      {"port": "8080", "protocol": "udp"}],
+	    "rules": {
+                "HTTP": [{
+		    "method": "GET",
+		    "path": "/private"
+                }]
+	    }
+	}]
     }]
 }]
 EOF
@@ -267,28 +366,52 @@ function proxy_test {
   log "beginning proxy test"
   monitor_clear
 
-  log "trying to reach server IPv4 at http://$SERVER_IP4:80/public from client (expected: 200)"
-  RETURN=$(docker exec -i client bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://$SERVER_IP4:80/public")
+  log "trying to reach server IPv4 at http://$SERVER_IP4:80/public from client1 (expected: 200)"
+  RETURN=$(docker exec -i client1 bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://$SERVER_IP4:80/public")
   if [[ "${RETURN//$'\n'}" != "200" ]]; then
     abort "GET /public, unexpected return ${RETURN//$'\n'} != 200"
   fi
 
-  log "trying to reach server IPv6 at http://[$SERVER_IP]:80/public from client (expected: 200)"
-  RETURN=$(docker exec -i client bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://[$SERVER_IP]:80/public")
+  log "trying to reach server IPv4 at http://$SERVER_IP4:80/public from client2 (expected: 403)"
+  RETURN=$(docker exec -i client2 bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://$SERVER_IP4:80/public")
+  if [[ "${RETURN//$'\n'}" != "403" ]]; then
+    abort "GET /public, unexpected return ${RETURN//$'\n'} != 403"
+  fi
+
+  log "trying to reach server IPv6 at http://[$SERVER_IP]:80/public from client1 (expected: 200)"
+  RETURN=$(docker exec -i client1 bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://[$SERVER_IP]:80/public")
   if [[ "${RETURN//$'\n'}" != "200" ]]; then
     abort "GET /public, unexpected return ${RETURN//$'\n'} != 200"
   fi
 
-  log "trying to reach server IPv4 at http://$SERVER_IP4:80/private from client (expected: 403)"
-  RETURN=$(docker exec -i client bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://$SERVER_IP4:80/private")
+  log "trying to reach server IPv6 at http://[$SERVER_IP]:80/public from client2 (expected: 403)"
+  RETURN=$(docker exec -i client2 bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://[$SERVER_IP]:80/public")
+  if [[ "${RETURN//$'\n'}" != "403" ]]; then
+    abort "GET /public, unexpected return ${RETURN//$'\n'} != 403"
+  fi
+
+  log "trying to reach server IPv4 at http://$SERVER_IP4:80/private from client1 (expected: 403)"
+  RETURN=$(docker exec -i client1 bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://$SERVER_IP4:80/private")
   if [[ "${RETURN//$'\n'}" != "403" ]]; then
     abort "GET /private, unexpected return ${RETURN//$'\n'} != 403"
   fi
 
-  log "trying to reach server IPv6 at http://[$SERVER_IP]:80/private from client (expected: 403)"
-  RETURN=$(docker exec -i client bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://[$SERVER_IP]:80/private")
+  log "trying to reach server IPv4 at http://$SERVER_IP4:80/private from client2 (expected: 200)"
+  RETURN=$(docker exec -i client2 bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://$SERVER_IP4:80/private")
+  if [[ "${RETURN//$'\n'}" != "200" ]]; then
+    abort "GET /private, unexpected return ${RETURN//$'\n'} != 200"
+  fi
+
+  log "trying to reach server IPv6 at http://[$SERVER_IP]:80/private from client1 (expected: 403)"
+  RETURN=$(docker exec -i client1 bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://[$SERVER_IP]:80/private")
   if [[ "${RETURN//$'\n'}" != "403" ]]; then
     abort "GET /private, unexpected return ${RETURN//$'\n'} != 403"
+  fi
+
+  log "trying to reach server IPv6 at http://[$SERVER_IP]:80/private from client2 (expected: 200)"
+  RETURN=$(docker exec -i client2 bash -c "curl -s --output /dev/stderr -w '%{http_code}' --connect-timeout 10 -XGET http://[$SERVER_IP]:80/private")
+  if [[ "${RETURN//$'\n'}" != "200" ]]; then
+    abort "GET /private, unexpected return ${RETURN//$'\n'} != 200"
   fi
 
   log "finished proxy test"
@@ -335,6 +458,6 @@ cilium service delete --all
 log "deleting all policies from Cilium"
 cilium policy delete --all 2> /dev/null || true
 log "removing containers"
-docker rm -f server1 server2 client 2> /dev/null || true
+docker rm -f server1 server2 client1 2> /dev/null || true
 
 test_succeeded "${TEST_NAME}"
