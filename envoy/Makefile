@@ -42,7 +42,15 @@ BAZEL_BUILD_OPTS = --spawn_strategy=standalone --genrule_strategy=standalone
 all: clean-bins release
 else
 BAZEL_OPTS ?=
-BAZEL_BUILD_OPTS = --experimental_strict_action_env
+
+# ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH must be set to the same value pilot-agent
+# passes in --max-obj-name-len to Envoy, otherwise Envoy crashes with an assert
+# error:
+# https://github.com/istio/istio/blob/master/pilot/pkg/proxy/envoy/v1/watcher.go#L295
+# https://github.com/istio/istio/blob/master/pilot/pkg/proxy/envoy/v1/resources.go#L130
+BAZEL_BUILD_OPTS = \
+	--experimental_strict_action_env \
+	--copt=-DENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH=189
 
 ISTIO_VERSION = 0.6.0
 
