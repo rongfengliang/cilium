@@ -7,7 +7,7 @@ workspace(name = "cilium")
 #
 # No other line in this file may have ENVOY_SHA followed by an equals sign!
 #
-ENVOY_SHA = "331603ab0810a005f67d8b8bf02a9f79f16e229d"
+ENVOY_SHA = "74133e7dc3ba5b54757914574dca394fc2d18a7a"
 
 http_archive(
     name = "envoy",
