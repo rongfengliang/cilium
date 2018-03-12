@@ -11,6 +11,8 @@
 #include "accesslog.h"
 #include "cilium/cilium_l7policy.pb.h"
 
+#include "cilium_network_policy.h"
+
 namespace Envoy {
 namespace Cilium {
 
@@ -33,17 +35,20 @@ struct FilterStats {
  * Per listener configuration for Cilium HTTP filter. This
  * is accessed by multiple working thread instances of the filter.
  */
-class Config : Logger::Loggable<Logger::Id::router> {
+class Config : public Logger::Loggable<Logger::Id::router> {
 public:
-  Config(const std::string& listener_id, const std::string& access_log_path, Stats::Scope &scope);
-  Config(const Json::Object &config, Stats::Scope &scope);
-  Config(const ::cilium::L7Policy &config, Stats::Scope& scope);
+  Config(const envoy::api::v2::core::ApiConfigSource& api_config_source,
+	 const std::string& listener_id, const std::string& access_log_path,
+	 Server::Configuration::FactoryContext& context);
+  Config(const Json::Object &config, Server::Configuration::FactoryContext& context);
+  Config(const ::cilium::L7Policy &config, Server::Configuration::FactoryContext& context);
   ~Config();
 
   void Log(AccessLog::Entry &, ::cilium::EntryType);
 
   FilterStats stats_;
   std::string listener_id_;
+  std::shared_ptr<const Cilium::NetworkPolicyMap> npmap_;
 
 private:
   AccessLog *access_log_;
@@ -54,7 +59,8 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
 // Each request gets their own instance of this filter, and
 // they can run parallel from multiple worker threads, all accessing
 // the shared configuration.
-class AccessFilter : public Http::StreamFilter {
+class AccessFilter : public Http::StreamFilter,
+                     Logger::Loggable<Logger::Id::router> {
 public:
   AccessFilter(ConfigSharedPtr& config) : config_(config), denied_(false) {}
 

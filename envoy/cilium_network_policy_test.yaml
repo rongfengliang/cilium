@@ -1,0 +1,15 @@
+version_info: "0"
+resources:
+- "@type": type.googleapis.com/cilium.NetworkPolicy
+  policy: 173
+  ingress_per_port_policies:
+  - port: 80
+    rules:
+    - remote_policies: [ 1 ]
+      http_rules:
+        http_rules:
+        - headers: [ { name: ':path', value: '/allowed', regex: false } ]
+        - headers: [ { name: ':path', value: '.*public$', regex: true } ]
+        - headers: [ { name: ':authority', value: 'allowedHOST', regex: false } ]
+        - headers: [ { name: ':authority', value: '.*REGEX.*', regex: true } ]
+        - headers: [ { name: ':method', value: 'PUT', regex: false }, { name: ':path', value: '/public/opinions', regex: false } ]

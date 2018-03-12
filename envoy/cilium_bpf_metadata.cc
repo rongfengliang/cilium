@@ -9,6 +9,8 @@
 
 #include "common/common/assert.h"
 
+#include "cilium_socket_option.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -27,7 +29,6 @@ public:
 	new Filter::BpfMetadata::Config(MessageUtil::downcastAndValidate<const ::cilium::BpfMetadata&>(proto_config),
 					context.scope()));
     // Set the socket mark option for the listen socket.
-    // TODO: Share
     context.setListenSocketOptions(std::make_shared<Cilium::SocketMarkOption>(config->getMark(config->identity_)));
 
     return [config](Network::ListenerFilterManager &filter_manager) mutable -> void {
