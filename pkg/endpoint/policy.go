@@ -741,7 +741,7 @@ func (e *Endpoint) regeneratePolicy(owner Owner, opts models.ConfigurationMap) (
 				logfields.PolicyID: srcID,
 				"ctx":              ctx,
 			}).Debug("Evaluating context for source PolicyID")
-			if repo.CanReachRLocked(&ctx) == api.Denied {
+			if repo.CanReachIngressRLocked(&ctx) == api.Denied {
 				// Denied explicitly by fromRequires clause.
 				deniedIngressIdentities[srcID] = true
 			}
@@ -749,7 +749,7 @@ func (e *Endpoint) regeneratePolicy(owner Owner, opts models.ConfigurationMap) (
 	}
 
 	// Publish the updated policy to L7 proxies.
-	// TODO: Pass the denied egress identities.
+	// TODO (ianvernon) - GH issue. Pass the denied egress identities.
 	err = owner.UpdateNetworkPolicy(c.ID, c.L4Policy, *labelsMap, deniedIngressIdentities, nil)
 	if err != nil {
 		return false, nil, nil, err
