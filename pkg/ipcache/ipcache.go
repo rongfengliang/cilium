@@ -98,7 +98,8 @@ func (ipc *IPCache) upsert(endpointIP string, identity identity.NumericIdentity)
 			Warning("unable to parse CIDR for upserting endpoint IP")
 	}
 	ipToUpsert := remoteendpointmap.NewEndpointKey(ip)
-	identityToUpsert := remoteendpointmap.RemoteEndpointInfo{SecurityIdentity: identity.Uint32()}
+
+	identityToUpsert := remoteendpointmap.RemoteEndpointInfo{SecurityIdentity: uint16(identity)}
 
 	err = remoteendpointmap.RemoteEpMap.Update(ipToUpsert, identityToUpsert)
 	if err != nil {
