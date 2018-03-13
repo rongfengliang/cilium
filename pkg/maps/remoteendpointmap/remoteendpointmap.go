@@ -37,8 +37,8 @@ func NewEndpointKey(ip net.IP) EndpointKey {
 // RemoteEndpointInfo implements the bpf.MapValue interface. It contains the
 // security identity of a remote endpoint.
 type RemoteEndpointInfo struct {
-	SecurityIdentity uint32
-	Pad              [2]uint16
+	SecurityIdentity uint16
+	Pad              [3]uint16
 }
 
 func (v RemoteEndpointInfo) String() string {
@@ -60,7 +60,7 @@ var (
 	// Cilium agent is a part of to their corresponding security identities.
 	// It is a singleton; there is only one such map per agent.
 	RemoteEpMap = bpf.NewMap(
-		"cilium_remote_endpoints",
+		"cilium_remote_lxc",
 		bpf.BPF_MAP_TYPE_HASH,
 		int(unsafe.Sizeof(EndpointKey{})),
 		int(unsafe.Sizeof(RemoteEndpointInfo{})),
