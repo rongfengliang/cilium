@@ -101,6 +101,10 @@ allow:
 #endif /* DROP_ALL */
 }
 
+#endif /* REQUIRES_CAN_ACCESS */
+
+#ifdef POLICY_INGRESS
+
 /**
  * Determine whether the policy allows this traffic on ingress.
  * @arg skb		Packet to allow or deny
@@ -148,7 +152,7 @@ allow:
 #endif /* DROP_ALL */
 }
 
-#else /* POLICY_INGRESS || REQUIRES_CAN_ACCESS */
+#else /* POLICY_INGRESS */
 
 static inline int
 policy_can_access_ingress(struct __sk_buff *skb, __u32 src_label,
@@ -158,7 +162,7 @@ policy_can_access_ingress(struct __sk_buff *skb, __u32 src_label,
 	return TC_ACT_OK;
 }
 
-#endif /* POLICY_INGRESS || REQUIRES_CAN_ACCESS */
+#endif /* POLICY_INGRESS */
 
 #if defined POLICY_EGRESS && defined LXC_ID
 
@@ -194,11 +198,11 @@ static inline int policy_can_egress6(struct __sk_buff *skb,
 	struct remote_endpoint_info *info;
 	__u16 identity = 0;
 
-	info = lookup_ip6_remote_endpoint(&tuple->daddr);
+	info = lookup_ip6_remote_endpoint(&tuple->saddr);
 	if (info)
 		identity = info->sec_label;
 	else
-		cilium_dbg(skb, DBG_IP_ID_MAP_FAILED6, tuple->daddr.p4, 0);
+		cilium_dbg(skb, DBG_IP_ID_MAP_FAILED6, tuple->saddr.p4, 0);
 
 	return policy_can_egress(skb, identity, tuple->dport, tuple->nexthdr);
 }
@@ -209,11 +213,11 @@ static inline int policy_can_egress4(struct __sk_buff *skb,
 	struct remote_endpoint_info *info;
 	__u16 identity = 0;
 
-	info = lookup_ip4_remote_endpoint(tuple->daddr);
+	info = lookup_ip4_remote_endpoint(tuple->saddr);
 	if (info)
 		identity = info->sec_label;
 	else
-		cilium_dbg(skb, DBG_IP_ID_MAP_FAILED4, tuple->daddr, 0);
+		cilium_dbg(skb, DBG_IP_ID_MAP_FAILED4, tuple->saddr, 0);
 
 	return policy_can_egress(skb, identity, tuple->dport, tuple->nexthdr);
 }

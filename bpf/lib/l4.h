@@ -203,7 +203,7 @@ l4_egress_policy(struct __sk_buff *skb, __be16 dport, __u8 nexthdr)
 #ifdef CFG_L4_EGRESS
 	return l4_egress_embedded(dport, nexthdr);
 #else
-	return 0;
+	return DROP_POLICY_L4;
 #endif
 }
 
