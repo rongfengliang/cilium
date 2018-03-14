@@ -16,9 +16,11 @@ package envoy
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -36,7 +38,6 @@ import (
 	"github.com/cilium/cilium/pkg/policy"
 	"github.com/cilium/cilium/pkg/policy/api"
 
-	"fmt"
 	"github.com/gogo/protobuf/sortkeys"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/duration"
@@ -44,10 +45,24 @@ import (
 	"github.com/golang/protobuf/ptypes/wrappers"
 )
 
-// allowAction is a "Pass" route action to use in route rules. Immutable.
-var envoyRouteAllowAction = &envoy_api_v2_route.Route_Route{Route: &envoy_api_v2_route.RouteAction{
-	ClusterSpecifier: &envoy_api_v2_route.RouteAction_Cluster{Cluster: "cluster1"},
-}}
+var (
+	// allowAction is a "Pass" route action to use in route rules. Immutable.
+	envoyRouteAllowAction = &envoy_api_v2_route.Route_Route{Route: &envoy_api_v2_route.RouteAction{
+		ClusterSpecifier: &envoy_api_v2_route.RouteAction_Cluster{Cluster: "cluster1"},
+	}}
+
+	// xds is the xDS GRPC server.
+	xdsServer *XDSServer
+)
+
+// StartProxySupportServers starts the xDS GRPC server and the access log
+// server used by proxies.
+func StartProxySupportServers(stateDir string) {
+	xdsPath := filepath.Join(stateDir, "xds.sock")
+	accessLogPath := filepath.Join(stateDir, "access_log.sock")
+	startAccesslogServer(accessLogPath)
+	xdsServer = configureAndStartXDSGRPCServer(xdsPath, accessLogPath)
+}
 
 // XDSServer provides a high-lever interface to manage resources published
 // using the xDS gRPC API.
@@ -75,7 +90,7 @@ type XDSServer struct {
 	stopServer context.CancelFunc
 }
 
-func createXDSServer(path, accessLogPath string) *XDSServer {
+func configureAndStartXDSGRPCServer(path, accessLogPath string) *XDSServer {
 	os.Remove(path)
 	socketListener, err := net.ListenUnix("unix", &net.UnixAddr{Name: path, Net: "unix"})
 	if err != nil {
@@ -106,7 +121,7 @@ func createXDSServer(path, accessLogPath string) *XDSServer {
 		AckObserver: rdsMutator,
 	}
 
-	stopServer := StartXDSGRPCServer(socketListener, ldsConfig, npdsConfig, nphdsConfig, rdsConfig, 5*time.Second)
+	stopServer := startXDSGRPCServer(socketListener, ldsConfig, npdsConfig, nphdsConfig, rdsConfig, 5*time.Second)
 
 	listenerProto := &envoy_api_v2.Listener{
 		Address: &envoy_api_v2_core.Address{
